@@ -14,18 +14,25 @@ import {generateDependencyReport} from '@discordjs/voice';
 import {REST} from '@discordjs/rest';
 import {Routes} from 'discord-api-types/v10';
 import registerCommandsOnGuild from './utils/register-commands-on-guild.js';
+import ControlApiServer from './services/control-api.js';
 
 @injectable()
 export default class {
   private readonly client: Client;
   private readonly config: Config;
+  private readonly controlApi: ControlApiServer;
   private readonly shouldRegisterCommandsOnBot: boolean;
   private readonly commandsByName!: Collection<string, Command>;
   private readonly commandsByButtonId!: Collection<string, Command>;
 
-  constructor(@inject(TYPES.Client) client: Client, @inject(TYPES.Config) config: Config) {
+  constructor(
+    @inject(TYPES.Client) client: Client,
+    @inject(TYPES.Config) config: Config,
+    @inject(TYPES.Services.ControlApi) controlApi: ControlApiServer,
+  ) {
     this.client = client;
     this.config = config;
+    this.controlApi = controlApi;
     this.shouldRegisterCommandsOnBot = config.REGISTER_COMMANDS_ON_BOT;
     this.commandsByName = new Collection();
     this.commandsByButtonId = new Collection();
@@ -120,7 +127,19 @@ export default class {
 
       // Update commands
       const rest = new REST({version: '10'}).setToken(this.config.DISCORD_TOKEN);
-      if (this.shouldRegisterCommandsOnBot) {
+      if (!this.config.REGISTER_SLASH_COMMANDS) {
+        // CruiseBot-controlled mode: no slash commands at all, control happens
+        // entirely through the control API / CruiseBot's Staff Panel. Actively
+        // clear both bot-level and per-guild commands so any commands
+        // registered by a previous run (or before switching modes) disappear.
+        spinner.text = '📡 clearing slash commands (CruiseBot control mode)...';
+        await Promise.all([
+          rest.put(Routes.applicationCommands(this.client.user!.id), {body: []}),
+          ...this.client.guilds.cache.map(async guild =>
+            rest.put(Routes.applicationGuildCommands(this.client.user!.id, guild.id), {body: []}),
+          ),
+        ]);
+      } else if (this.shouldRegisterCommandsOnBot) {
         spinner.text = '📡 updating commands on bot...';
         await rest.put(
           Routes.applicationCommands(this.client.user!.id),
@@ -143,6 +162,8 @@ export default class {
         ],
         );
       }
+
+      this.controlApi.start();
 
       this.client.user!.setPresence({
         activities: [

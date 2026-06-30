@@ -30,6 +30,13 @@ const CONFIG_MAP = {
   SPONSORBLOCK_TIMEOUT: parseInt(process.env.SPONSORBLOCK_TIMEOUT ?? '5', 10),
   YT_DLP_PATH: firstNonEmpty(process.env.YT_DLP_PATH, process.env.MUSE_BUNDLED_YT_DLP_PATH) ?? 'yt-dlp',
   YT_DLP_AUTO_UPDATE: process.env.YT_DLP_AUTO_UPDATE === 'true',
+  // CruiseBot integration - see src/services/control-api.ts. Defaults preserve
+  // stock Muse behavior (slash commands on, control API off) so this fork
+  // behaves identically to upstream unless explicitly configured otherwise.
+  REGISTER_SLASH_COMMANDS: process.env.REGISTER_SLASH_COMMANDS !== 'false',
+  CONTROL_API_ENABLED: process.env.CONTROL_API_ENABLED === 'true',
+  CONTROL_API_PORT: parseInt(process.env.CONTROL_API_PORT ?? '3939', 10),
+  CONTROL_API_TOKEN: process.env.CONTROL_API_TOKEN ?? '',
 } as const;
 
 const BOT_ACTIVITY_TYPE_MAP = {
@@ -57,6 +64,10 @@ export default class Config {
   readonly SPONSORBLOCK_TIMEOUT!: number;
   readonly YT_DLP_PATH!: string;
   readonly YT_DLP_AUTO_UPDATE!: boolean;
+  readonly REGISTER_SLASH_COMMANDS!: boolean;
+  readonly CONTROL_API_ENABLED!: boolean;
+  readonly CONTROL_API_PORT!: number;
+  readonly CONTROL_API_TOKEN!: string;
 
   constructor() {
     for (const [key, value] of Object.entries(CONFIG_MAP)) {
