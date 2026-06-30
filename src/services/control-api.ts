@@ -6,8 +6,9 @@
 // only calls the same PlayerManager/Player methods the slash commands
 // already use.
 //
-// Bound to 127.0.0.1 only and gated by a bearer token - never exposed
-// outside the host/container network.
+// Reachable only from the Docker host (via a 127.0.0.1-only published port -
+// see docker-compose.yml) and gated by a bearer token. Never publish this
+// port on anything other than 127.0.0.1.
 
 import http, {IncomingMessage, ServerResponse} from 'http';
 import {Client, ChannelType, VoiceChannel} from 'discord.js';
@@ -130,9 +131,14 @@ export default class ControlApiServer {
       });
     });
 
-    // 127.0.0.1 only - never bind 0.0.0.0. This is the entire trust boundary.
-    this.server.listen(this.config.CONTROL_API_PORT, '127.0.0.1', () => {
-      console.log(`Control API listening on 127.0.0.1:${this.config.CONTROL_API_PORT}`);
+    // Binds on all interfaces *inside* the container - Docker's port publishing
+    // forwards to the container's bridge interface, not its loopback, so a
+    // 127.0.0.1-only bind here would be unreachable even from the host. The
+    // actual trust boundary is the docker-compose port mapping
+    // ("127.0.0.1:PORT:PORT"), which restricts this to host-local processes
+    // only. The bearer token is the second layer of defense either way.
+    this.server.listen(this.config.CONTROL_API_PORT, () => {
+      console.log(`Control API listening on :${this.config.CONTROL_API_PORT}`);
     });
   }
 
